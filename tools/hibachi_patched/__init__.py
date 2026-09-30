@@ -1,0 +1,265 @@
+"""Hibachi Python SDK.
+
+This module provides a Python SDK for interacting with the Hibachi XYZ
+cryptocurrency exchange API, including HTTP and WebSocket clients for trading,
+market data, and account management.
+"""
+
+import logging
+from importlib.metadata import version
+from pathlib import Path
+
+# py3.10 compat (SDK 0.3.2 targets 3.13): backport typing.Self/override
+import typing as _typing
+
+if not hasattr(_typing, "Self"):
+    from typing_extensions import Self, override
+
+    _typing.Self = Self
+    _typing.override = override
+
+import toml
+
+from hibachi_xyz.api import HibachiApiClient, price_to_bytes
+from hibachi_xyz.api_ws_account import HibachiWSAccountClient
+from hibachi_xyz.api_ws_market import HibachiWSMarketClient
+from hibachi_xyz.api_ws_trade import HibachiWSTradeClient
+from hibachi_xyz.errors import (
+    BaseError,
+    DeserializationError,
+    ExchangeError,
+    HttpConnectionError,
+    MissingCredentialsError,
+    SerializationError,
+    TransportError,
+    TransportTimeoutError,
+    ValidationError,
+    WebSocketConnectionError,
+    WebSocketMessageError,
+)
+from hibachi_xyz.helpers import print_data
+from hibachi_xyz.types import (  # type: ignore[attr-defined]
+    AccountInfo,
+    AccountSnapshot,
+    AccountStreamStartResult,
+    AccountTrade,
+    AccountTradesResponse,
+    Asset,
+    BatchOrder,
+    BatchResponse,
+    BatchResponseOrder,
+    CancelOrder,
+    CapitalBalance,
+    CapitalHistory,
+    CreateOrder,
+    CrossChainAsset,
+    DepositInfo,
+    EnableCancelOnDisconnectParams,
+    ExchangeInfo,
+    FeeConfig,
+    FundingRateEstimation,
+    FutureContract,
+    HibachiApiError,
+    Interval,
+    InventoryResponse,
+    Kline,
+    KlinesResponse,
+    MaintenanceWindow,
+    Market,
+    MarketInfo,
+    Nonce,
+    OpenInterestResponse,
+    Order,
+    OrderBook,
+    OrderBookLevel,
+    OrderCancelParams,
+    OrderFlags,
+    OrderId,
+    OrderIdVariant,
+    OrderModifyParams,
+    OrderPlaceParams,
+    OrderPlaceResponse,
+    OrderPlaceResponseResult,
+    OrderResponse,
+    OrdersBatchParams,
+    OrdersCancelParams,
+    OrdersStatusParams,
+    OrdersStatusResponse,
+    OrderStatus,
+    OrderStatusParams,
+    OrderStatusResponse,
+    OrderType,
+    PendingOrdersResponse,
+    Position,
+    PriceResponse,
+    Settlement,
+    SettlementsResponse,
+    Side,
+    StatsResponse,
+    TakerSide,
+    TPSLConfig,
+    Trade,
+    TradesResponse,
+    TradingTier,
+    Transaction,
+    TransferRequest,
+    TransferResponse,
+    TriggerDirection,
+    TWAPConfig,
+    TWAPQuantityMode,
+    UpdateOrder,
+    WebSocketBatchOrder,
+    WebSocketEvent,
+    WebSocketMarketSubscriptionListResponse,
+    WebSocketOrderCancelParams,
+    WebSocketOrderModifyParams,
+    WebSocketOrdersBatchParams,
+    WebSocketOrdersCancelParams,
+    WebSocketOrdersStatusParams,
+    WebSocketOrderStatusParams,
+    WebSocketResponse,
+    WebSocketStreamPingParams,
+    WebSocketStreamStartParams,
+    WebSocketStreamStopParams,
+    WebSocketSubscription,
+    WebSocketSubscriptionTopic,
+    WithdrawalLimit,
+    WithdrawRequest,
+    WithdrawResponse,
+    check_tick_size,
+    round_price_to_tick,
+    round_quantity_to_step,
+)
+
+log = logging.getLogger(__name__)
+
+
+def get_version() -> str:
+    """Return the version of the hibachi library package."""
+    try:
+        pyproject_path = Path(__file__).parents[1] / "pyproject.toml"
+        if pyproject_path.exists():
+            with open(pyproject_path) as f:
+                pyproject = toml.loads(f.read())
+
+            return str(pyproject["project"]["version"])
+
+        return version("hibachi_xyz")
+    # this is used only for telemetry, if for some reason we cannot get the version we do not want to break the rest of the api
+    except Exception as e:
+        log.warning(f"Unable to find SDK version - telemetry degraded : {e}")
+        return "0.0.0-unknown"
+
+
+__version__: str = get_version()
+__all__ = [
+    "HibachiApiClient",
+    "HibachiApiError",
+    "BaseError",
+    "ExchangeError",
+    "TransportError",
+    "ValidationError",
+    "MissingCredentialsError",
+    "HttpConnectionError",
+    "TransportTimeoutError",
+    "WebSocketConnectionError",
+    "WebSocketMessageError",
+    "DeserializationError",
+    "SerializationError",
+    "Interval",
+    "Nonce",
+    "OrderId",
+    "Side",
+    "TWAPConfig",
+    "TWAPQuantityMode",
+    "CreateOrder",
+    "UpdateOrder",
+    "CancelOrder",
+    "HibachiWSMarketClient",
+    "HibachiWSTradeClient",
+    "HibachiWSAccountClient",
+    "price_to_bytes",
+    "OrderIdVariant",
+    "TPSLConfig",
+    "OrderType",
+    "TriggerDirection",
+    "OrderStatus",
+    "OrderFlags",
+    "Order",
+    "FeeConfig",
+    "FutureContract",
+    "WithdrawalLimit",
+    "MaintenanceWindow",
+    "ExchangeInfo",
+    "FundingRateEstimation",
+    "PriceResponse",
+    "BatchResponseOrder",
+    "BatchResponse",
+    "StatsResponse",
+    "TakerSide",
+    "Trade",
+    "TradesResponse",
+    "Kline",
+    "KlinesResponse",
+    "OpenInterestResponse",
+    "OrderBookLevel",
+    "OrderBook",
+    "Asset",
+    "Position",
+    "AccountInfo",
+    "AccountTrade",
+    "AccountTradesResponse",
+    "Settlement",
+    "SettlementsResponse",
+    "PendingOrdersResponse",
+    "CapitalBalance",
+    "Transaction",
+    "CapitalHistory",
+    "WithdrawRequest",
+    "WithdrawResponse",
+    "TransferRequest",
+    "TransferResponse",
+    "DepositInfo",
+    "WebSocketSubscriptionTopic",
+    "WebSocketSubscription",
+    "WebSocketMarketSubscriptionListResponse",
+    "WebSocketResponse",
+    "WebSocketEvent",
+    "WebSocketOrderCancelParams",
+    "WebSocketOrderModifyParams",
+    "WebSocketOrderStatusParams",
+    "WebSocketOrdersStatusParams",
+    "WebSocketOrdersCancelParams",
+    "WebSocketBatchOrder",
+    "WebSocketOrdersBatchParams",
+    "WebSocketStreamStartParams",
+    "WebSocketStreamPingParams",
+    "WebSocketStreamStopParams",
+    "AccountSnapshot",
+    "AccountStreamStartResult",
+    "OrderPlaceParams",
+    "OrderCancelParams",
+    "OrderModifyParams",
+    "OrderStatusParams",
+    "OrdersStatusParams",
+    "OrdersCancelParams",
+    "BatchOrder",
+    "OrdersBatchParams",
+    "EnableCancelOnDisconnectParams",
+    "OrderResponse",
+    "OrderPlaceResponseResult",
+    "OrderPlaceResponse",
+    "OrdersStatusResponse",
+    "OrderStatusResponse",
+    "CrossChainAsset",
+    "TradingTier",
+    "MarketInfo",
+    "Market",
+    "InventoryResponse",
+    "__version__",
+    "print_data",
+    "HibachiApiError",
+    "check_tick_size",
+    "round_price_to_tick",
+    "round_quantity_to_step",
+]

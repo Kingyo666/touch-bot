@@ -1,0 +1,3 @@
+lighter
+# 注意：hibachi_xyz 不要从 PyPI 直接安装后直接用——PyPI 版在部分环境下有签名/兼容问题，
+# 按 README/AGENTS.md 的步骤安装 tools/hibachi_patched/ 覆盖版
